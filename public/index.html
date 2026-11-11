@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RE/MAX Agapê | Imóveis à venda e para alugar em São Paulo</title>
+  <meta name="description" content="Encontre casas, apartamentos e sobrados à venda e para alugar com a RE/MAX Agapê. Filtre, monte seu carrinho de imóveis e fale direto com o corretor pelo WhatsApp.">
+  <meta name="theme-color" content="#13284a">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="RE/MAX Agapê — Imóveis em São Paulo">
+  <meta property="og:description" content="Mais de 30 anos realizando sonhos no Parque São Lucas e região.">
+  <meta property="og:image" content="/img/logo-agape.webp">
+  <link rel="icon" href="/img/favicon.webp" type="image/webp">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://images.usenonstop.com.br">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <main>
+    <!-- Hero + busca -->
+    <section class="hero">
+      <div class="hero-bg" id="hero-bg"></div>
+      <div class="container">
+        <span class="hero-tag"><i></i>Ninguém no mundo vende mais imóveis que a RE/MAX</span>
+        <h1>Encontre o imóvel <em>certo</em> para a sua próxima história.</h1>
+        <p class="lead">Mais de 30 anos realizando sonhos no Parque São Lucas e região. Escolha, adicione ao carrinho e fale com o corretor em um clique.</p>
+
+        <form class="busca" id="form-busca" role="search">
+          <div class="busca-tabs" role="tablist" aria-label="Finalidade">
+            <button type="button" role="tab" data-fin="venda" aria-selected="true">Comprar</button>
+            <button type="button" role="tab" data-fin="locacao" aria-selected="false">Alugar</button>
+          </div>
+          <div class="busca-campos">
+            <label class="campo">
+              <span class="sr-only">Buscar por bairro, rua ou código</span>
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+              <input id="busca-texto" type="search" placeholder="Bairro, rua, cidade ou código do imóvel" autocomplete="off" list="sugestoes">
+              <datalist id="sugestoes"></datalist>
+            </label>
+            <label class="campo">
+              <span class="sr-only">Tipo de imóvel</span>
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9v12h14V9"/><path d="M10 21v-6h4v6"/></svg>
+              <select id="busca-tipo"><option value="">Todos os tipos</option></select>
+            </label>
+            <button class="btn btn-primary" type="submit">Buscar imóveis</button>
+          </div>
+        </form>
+
+        <div class="stats" id="stats" aria-live="polite">
+          <div><strong id="st-total">—</strong>imóveis disponíveis</div>
+          <div><strong id="st-bairros">—</strong>bairros atendidos</div>
+          <div><strong>30+</strong>anos de mercado</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Catálogo -->
+    <div class="container" id="imoveis" style="scroll-margin-top: var(--header-h)">
+      <div class="atalhos" id="atalhos" aria-label="Tipos de imóvel"></div>
+
+      <div class="catalogo">
+        <aside class="filtros" id="filtros" aria-label="Filtros">
+          <div class="filtros-topo">
+            <h2>Filtros</h2>
+            <div style="display:flex;gap:6px;align-items:center">
+              <button class="chip-limpar" type="button" id="limpar-topo">Limpar</button>
+              <button class="icone-btn fechar" type="button" id="fechar-filtros" aria-label="Fechar filtros">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="grupo">
+            <h3>Finalidade</h3>
+            <div class="segmentado" id="f-fin">
+              <button type="button" data-v="venda" aria-pressed="true">Comprar</button>
+              <button type="button" data-v="locacao" aria-pressed="false">Alugar</button>
+            </div>
+          </div>
+
+          <div class="grupo">
+            <h3>Tipo de imóvel</h3>
+            <div class="checks" id="f-tipos"></div>
+          </div>
+
+          <div class="grupo">
+            <h3>Preço</h3>
+            <div class="faixa">
+              <label><span>Mínimo</span><input class="input" id="f-pmin" inputmode="numeric" placeholder="R$ 0"></label>
+              <label><span>Máximo</span><input class="input" id="f-pmax" inputmode="numeric" placeholder="Sem limite"></label>
+            </div>
+            <div class="presets" id="f-presets"></div>
+          </div>
+
+          <div class="grupo">
+            <h3>Quartos</h3>
+            <div class="pills" data-campo="quartos"></div>
+          </div>
+          <div class="grupo">
+            <h3>Banheiros</h3>
+            <div class="pills" data-campo="banheiros"></div>
+          </div>
+          <div class="grupo">
+            <h3>Vagas de garagem</h3>
+            <div class="pills" data-campo="vagas"></div>
+          </div>
+
+          <div class="grupo">
+            <h3>Área útil (m²)</h3>
+            <div class="faixa">
+              <label><span>Mínima</span><input class="input" id="f-amin" inputmode="numeric" placeholder="0"></label>
+              <label><span>Máxima</span><input class="input" id="f-amax" inputmode="numeric" placeholder="Sem limite"></label>
+            </div>
+          </div>
+
+          <div class="grupo">
+            <h3>Bairro</h3>
+            <input class="input filtro-busca" id="f-bairro-busca" type="search" placeholder="Procurar bairro…" aria-label="Procurar bairro">
+            <div class="checks rolavel" id="f-bairros"></div>
+          </div>
+
+          <div class="grupo">
+            <h3>Cidade</h3>
+            <div class="checks" id="f-cidades"></div>
+          </div>
+
+          <div class="grupo">
+            <h3>Características</h3>
+            <div class="checks" id="f-carac"></div>
+            <button class="ver-mais" type="button" id="carac-mais">Ver todas</button>
+          </div>
+
+          <div class="filtros-rodape">
+            <button class="btn btn-navy btn-block" type="button" id="aplicar-filtros">Ver imóveis</button>
+          </div>
+        </aside>
+
+        <section aria-labelledby="titulo-resultados">
+          <div class="resultados-topo">
+            <h2 id="titulo-resultados">Imóveis à venda<small id="contagem">Carregando…</small></h2>
+            <div class="ordem">
+              <button class="btn btn-outline btn-filtros" type="button" id="abrir-filtros">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></svg>Filtros <b id="n-filtros"></b>
+              </button>
+              <label class="sr-only" for="ordem">Ordenar por</label>
+              <select id="ordem">
+                <option value="recentes">Mais recentes</option>
+                <option value="menor">Menor preço</option>
+                <option value="maior">Maior preço</option>
+                <option value="area">Maior área</option>
+                <option value="m2">Menor preço por m²</option>
+              </select>
+            </div>
+          </div>
+          <div class="chips" id="chips"></div>
+          <div class="grid" id="grid" aria-live="polite"></div>
+          <div class="carregar-mais" id="mais"></div>
+        </section>
+      </div>
+    </div>
+
+    <!-- Como funciona / Sobre -->
+    <section class="secao secao-escura" id="sobre">
+      <div class="container sobre">
+        <div>
+          <span class="eyebrow">RE/MAX Agapê</span>
+          <h2>Tradição de três décadas, atendimento de quem conhece cada rua da região.</h2>
+          <p>Nosso compromisso é mais do que vender imóveis: é criar laços duradouros com pessoas. Explore nosso portfólio, separe os imóveis que mais combinam com você e fale diretamente com o corretor responsável.</p>
+          <a class="btn btn-primary" href="#imoveis">Explorar imóveis</a>
+        </div>
+        <div class="passos">
+          <div class="passo"><b>1</b><div><h3>Filtre do seu jeito</h3><p>Preço, bairro, quartos, vagas, área e características — como numa loja online.</p></div></div>
+          <div class="passo"><b>2</b><div><h3>Monte seu carrinho</h3><p>Adicione quantos imóveis quiser. Ele fica salvo no seu navegador.</p></div></div>
+          <div class="passo"><b>3</b><div><h3>Envie pelo WhatsApp</h3><p>A lista vai pronta para o corretor de cada imóvel, já com os links. É só agendar as visitas.</p></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="secao" id="equipe">
+      <div class="container">
+        <span class="eyebrow escuro">Nosso time</span>
+        <h2 class="titulo">Fale direto com o corretor</h2>
+        <div class="equipe" id="lista-equipe"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="/js/comum.js"></script>
+  <script src="/js/catalogo.js"></script>
+</body>
+</html>
