@@ -58,15 +58,30 @@ O normalizador entende o formato do Nonstop/Square (`base36Id`, `values.sale`, `
 **Depuração:** as últimas 200 chamadas ficam em `data/webhook-log.jsonl`, com o corpo recebido e o
 resultado. Na primeira integração real, confira esse arquivo para ajustar o mapeamento, se precisar.
 
-## Publicação
+## Publicação na Netlify (atual)
 
-Funciona em qualquer hospedagem que rode Node e tenha **disco persistente** (o catálogo fica em
-`data/imoveis.json`): VPS, Railway, Render (com disk), Fly.io (com volume), Hostinger VPS etc.
+O `netlify.toml` já configura tudo:
+- `public/` é servido pela CDN
+- `netlify/functions/app.mjs` atende `/api/*`, `/imovel/*`, `/sitemap.xml` e `/robots.txt`
+- o catálogo fica no **Netlify Blobs** (store `catalogo`). Até o primeiro webhook ou sincronização,
+  usa `data/imoveis.json` do repositório como semente
+- `netlify/functions/sincronizar.mjs` reimporta os imóveis do site Square todo dia às 06:00
+  (desative com `SINCRONIZAR_SQUARE=false`)
 
-1. Copie `.env.example` para `.env` e preencha `SITE_URL` e `WEBHOOK_TOKEN`
-2. `npm start` (ou use PM2 / systemd)
-3. Cadastre a URL do webhook com o token no sistema da RE/MAX
-4. Opcional: agende `npm run importar` 1x por dia como sincronização de segurança
+Em **Site configuration → Environment variables**, defina:
 
-Para hospedagem serverless (Vercel/Netlify), troque `src/store.js` por um banco (Supabase,
-Postgres, Vercel KV). A interface tem só 5 funções.
+| Variável | Valor |
+|---|---|
+| `WEBHOOK_TOKEN` | um valor longo e aleatório (sem ele o webhook recusa tudo) |
+| `SITE_URL` | `https://seu-dominio` (opcional; usado no sitemap e nos links canônicos) |
+
+URL para cadastrar no sistema da RE/MAX: `https://seu-dominio/api/webhook/imoveis?token=SEU_TOKEN`
+(ou mande o token no header `X-Webhook-Token`).
+
+Para ver as últimas chamadas recebidas: `GET /api/webhook/log?token=SEU_TOKEN`.
+
+## Rodar em servidor próprio (VPS)
+
+`npm start` também funciona em qualquer servidor com Node 22+ e disco persistente; nesse caso o
+catálogo fica em `data/imoveis.json`. Configure o `.env` (veja `.env.example`) e agende
+`npm run importar` 1x por dia se quiser a sincronização de segurança.

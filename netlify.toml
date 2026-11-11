@@ -1,0 +1,32 @@
+[build]
+  publish = "public"
+  command = "echo 'Site estático em public/ + Netlify Functions'"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+  included_files = ["public/imovel.html", "data/imoveis.json"]
+
+# Página inicial com filtros na URL (/imoveis?...) usa o mesmo index.html
+[[redirects]]
+  from = "/imoveis"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/css/*"
+  [headers.values]
+    Cache-Control = "public, max-age=300"
+
+[[headers]]
+  for = "/js/*"
+  [headers.values]
+    Cache-Control = "public, max-age=300"
+
+[[headers]]
+  for = "/img/*"
+  [headers.values]
+    Cache-Control = "public, max-age=86400"

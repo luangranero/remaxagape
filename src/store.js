@@ -1,71 +1,112 @@
 'use strict';
 /**
- * Armazenamento simples em arquivo JSON (data/imoveis.json).
- * Escrita atômica (arquivo temporário + rename) para não corromper
- * o catálogo se o processo cair no meio de uma gravação.
+ * Armazenamento do catálogo.
  *
- * Para escalar (vários servidores / serverless), trocar por um banco
- * (Postgres, SQLite, Supabase...) mantendo a mesma interface.
+ *  - Na Netlify: Netlify Blobs (store "catalogo"), já que functions não têm disco.
+ *    Enquanto o blob não existir, usa data/imoveis.json (embutido no deploy) como semente.
+ *  - Local (npm start): arquivo data/imoveis.json, com escrita atômica.
+ *
+ * O catálogo inteiro é um único documento JSON (dezenas/centenas de imóveis),
+ * lido e gravado de uma vez — simples e consistente para esse volume.
  */
 const fs = require('fs');
 const path = require('path');
 
 const ARQ = process.env.DATA_FILE || path.join(__dirname, '..', 'data', 'imoveis.json');
+const ARQ_LOG = path.join(path.dirname(ARQ), 'webhook-log.jsonl');
+const LOG_MAX = 200;
 
-let cache = null;
+const naNetlify = () => Boolean(process.env.NETLIFY_BLOBS_CONTEXT || globalThis.Netlify);
 
-function carregar() {
-  if (cache) return cache;
-  try {
-    const dados = JSON.parse(fs.readFileSync(ARQ, 'utf8'));
-    cache = new Map((dados.imoveis || []).map((i) => [i.id, i]));
-  } catch {
-    cache = new Map();
+/* ---------- Netlify Blobs ---------- */
+let blobStore = null;
+async function blobs() {
+  if (!blobStore) {
+    const { getStore } = await import('@netlify/blobs');
+    blobStore = getStore({ name: 'catalogo', consistency: 'strong' });
   }
-  return cache;
+  return blobStore;
 }
 
-function persistir() {
+function semente() {
+  try {
+    // require estático: o bundler da Netlify embute o JSON na function
+    return require('../data/imoveis.json').imoveis || [];
+  } catch {
+    return [];
+  }
+}
+
+/* ---------- Arquivo local ---------- */
+function lerArquivo() {
+  try {
+    return JSON.parse(fs.readFileSync(ARQ, 'utf8')).imoveis || [];
+  } catch {
+    return [];
+  }
+}
+function gravarArquivo(doc) {
   fs.mkdirSync(path.dirname(ARQ), { recursive: true });
   const tmp = ARQ + '.tmp';
-  const imoveis = [...carregar().values()];
-  fs.writeFileSync(tmp, JSON.stringify({ atualizadoEm: new Date().toISOString(), total: imoveis.length, imoveis }, null, 2));
+  fs.writeFileSync(tmp, JSON.stringify(doc, null, 2));
   fs.renameSync(tmp, ARQ);
 }
 
-function listar() {
-  return [...carregar().values()];
+/* ---------- API ---------- */
+async function listar() {
+  if (naNetlify()) {
+    const doc = await (await blobs()).get('imoveis', { type: 'json' });
+    return doc ? doc.imoveis : semente();
+  }
+  return lerArquivo();
 }
 
-function obter(idOuCodigo) {
-  const m = carregar();
-  if (m.has(idOuCodigo)) return m.get(idOuCodigo);
-  const alvo = String(idOuCodigo).toUpperCase();
-  for (const i of m.values()) if (String(i.codigo).toUpperCase() === alvo || i.slug === idOuCodigo) return i;
-  return null;
+async function salvarTodos(imoveis) {
+  const doc = { atualizadoEm: new Date().toISOString(), total: imoveis.length, imoveis };
+  if (naNetlify()) await (await blobs()).setJSON('imoveis', doc);
+  else gravarArquivo(doc);
 }
 
-function salvar(imovel) {
-  const m = carregar();
-  // Mesmo imóvel pode chegar identificado só pelo código
-  const existente = obter(imovel.id) || obter(imovel.codigo);
-  if (existente && existente.id !== imovel.id) m.delete(existente.id);
-  m.set(imovel.id, imovel);
-  persistir();
-  return imovel;
+/** Busca por id, código (case-insensitive) ou slug. */
+function encontrar(lista, chave) {
+  const k = String(chave);
+  const K = k.toUpperCase();
+  return lista.find((i) => i.id === k) ||
+    lista.find((i) => String(i.codigo).toUpperCase() === K) ||
+    lista.find((i) => i.slug === k) || null;
 }
 
-function remover(idOuCodigo) {
-  const i = obter(idOuCodigo);
-  if (!i) return false;
-  carregar().delete(i.id);
-  persistir();
-  return true;
+async function obter(chave) {
+  return encontrar(await listar(), chave);
 }
 
-function salvarTodos(lista) {
-  cache = new Map(lista.map((i) => [i.id, i]));
-  persistir();
+async function registrarLog(entrada) {
+  const linha = { em: new Date().toISOString(), ...entrada };
+  try {
+    if (naNetlify()) {
+      const s = await blobs();
+      const atual = (await s.get('webhook-log', { type: 'json' })) || [];
+      atual.push(linha);
+      await s.setJSON('webhook-log', atual.slice(-LOG_MAX));
+    } else {
+      let linhas = [];
+      try { linhas = fs.readFileSync(ARQ_LOG, 'utf8').split('\n').filter(Boolean); } catch { /* primeiro log */ }
+      linhas.push(JSON.stringify(linha));
+      fs.mkdirSync(path.dirname(ARQ_LOG), { recursive: true });
+      fs.writeFileSync(ARQ_LOG, linhas.slice(-LOG_MAX).join('\n') + '\n');
+    }
+  } catch (e) {
+    console.error('Falha ao gravar log do webhook:', e.message);
+  }
 }
 
-module.exports = { listar, obter, salvar, remover, salvarTodos };
+async function lerLog() {
+  if (naNetlify()) return (await (await blobs()).get('webhook-log', { type: 'json' })) || [];
+  try {
+    return fs.readFileSync(ARQ_LOG, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
+  } catch {
+    return [];
+  }
+}
+
+module.exports = { listar, salvarTodos, obter, encontrar, registrarLog, lerLog, naNetlify };

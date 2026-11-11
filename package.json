@@ -1,6 +1,6 @@
 {
   "name": "remax-agape-site",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "Vitrine de imóveis da RE/MAX Agapê com filtros, carrinho e contato via WhatsApp, integrada por webhook ao CRM.",
   "main": "server.js",
@@ -10,7 +10,10 @@
     "importar": "node scripts/importar.js",
     "testar-webhook": "node scripts/testar-webhook.js"
   },
+  "dependencies": {
+    "@netlify/blobs": "11.1.5"
+  },
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   }
 }

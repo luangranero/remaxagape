@@ -1,15 +1,13 @@
 'use strict';
 /**
- * Importa os imóveis publicados no site atual da unidade (Square/Nonstop)
- * e grava em data/imoveis.json.
+ * Importa os imóveis publicados no site atual da unidade (Square/Nonstop).
  *
- * Uso:  npm run importar
+ *   npm run importar   → grava em data/imoveis.json (local)
  *
- * Serve para popular o catálogo enquanto o webhook não estiver configurado
- * e como sincronização de segurança (ex.: rodar 1x por dia via agendador).
+ * Na Netlify, a function agendada netlify/functions/sincronizar.mjs usa
+ * importarTudo() todo dia, como sincronização de segurança do webhook.
  */
 const { normalizarImovel } = require('../src/normalizar');
-const { salvarTodos } = require('../src/store');
 
 const BASE = process.env.SQUARE_URL || 'https://remaxagape.usesquare.com.br';
 const UA = 'Mozilla/5.0 (compatible; RemaxAgapeSite/1.0)';
@@ -60,8 +58,7 @@ function resolverTexto(txt, ref) {
 }
 
 async function importarUrl(url) {
-  const html = await get(url);
-  const txt = decodificarFlight(html);
+  const txt = decodificarFlight(await get(url));
   const i = txt.indexOf('"property":{"id":');
   if (i < 0) throw new Error('imóvel não encontrado na página');
   const prop = extrairJson(txt, i + '"property":'.length);
@@ -82,39 +79,37 @@ async function importarUrl(url) {
   return normalizarImovel(prop, { fotos, descricao });
 }
 
-async function main() {
-  console.log(`Lendo sitemap de ${BASE} ...`);
+/** Baixa e normaliza todos os imóveis do sitemap. */
+async function importarTudo({ concorrencia = 6, progresso = () => {} } = {}) {
   const sitemap = await get(`${BASE}/sitemap.xml`);
   const urls = [...new Set([...sitemap.matchAll(/<loc>([^<]*\/imovel\/[^<]*)<\/loc>/g)].map((m) => m[1]))];
-  console.log(`${urls.length} imóveis encontrados.`);
-
   const imoveis = [];
   const erros = [];
   const fila = [...urls];
-  const workers = Array.from({ length: 4 }, async () => {
+  await Promise.all(Array.from({ length: concorrencia }, async () => {
     while (fila.length) {
       const url = fila.shift();
-      try {
-        imoveis.push(await importarUrl(url));
-        process.stdout.write('.');
-      } catch (e) {
-        erros.push(`${url}: ${e.message}`);
-        process.stdout.write('x');
-      }
+      try { imoveis.push(await importarUrl(url)); progresso(true); }
+      catch (e) { erros.push(`${url}: ${e.message}`); progresso(false); }
     }
-  });
-  await Promise.all(workers);
-  console.log();
+  }));
+  return { imoveis, erros, total: urls.length };
+}
 
+async function main() {
+  const store = require('../src/store');
+  console.log(`Lendo sitemap de ${BASE} ...`);
+  const { imoveis, erros, total } = await importarTudo({ progresso: (ok) => process.stdout.write(ok ? '.' : 'x') });
+  console.log(`\n${total} imóveis no sitemap.`);
   if (!imoveis.length) {
     console.error('Nenhum imóvel importado. Nada foi alterado.');
     process.exit(1);
   }
-  salvarTodos(imoveis);
+  await store.salvarTodos(imoveis);
   console.log(`✔ ${imoveis.length} imóveis salvos em data/imoveis.json`);
   if (erros.length) console.warn(`⚠ ${erros.length} falhas:\n` + erros.join('\n'));
 }
 
 if (require.main === module) main().catch((e) => { console.error(e); process.exit(1); });
 
-module.exports = { decodificarFlight, extrairJson };
+module.exports = { importarTudo };
