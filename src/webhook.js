@@ -43,7 +43,9 @@ function autorizado(headers, corpoBruto, url) {
     if (recebido && igual(recebido, token)) return true;
   }
   if (segredo) {
-    const assinatura = String(headers.get('x-hub-signature-256') || headers.get('x-signature') || '').replace(/^sha256=/, '');
+    const assinatura = String(
+      headers.get('x-nonstop-signature') || headers.get('x-hub-signature-256') || headers.get('x-signature') || '',
+    ).replace(/^sha256=/, '').toLowerCase();
     const esperado = crypto.createHmac('sha256', segredo).update(corpoBruto).digest('hex');
     if (assinatura && igual(assinatura, esperado)) return true;
   }
@@ -77,7 +79,7 @@ const ORIGENS = {
   criadoEm: ['createdAt', 'criadoEm', 'created_at'],
   ocultarPreco: ['mgmt', 'ocultarPreco'],
   ocultarEndereco: ['mgmt', 'ocultarEndereco'],
-  ativo: ['status', 'situacao', 'ativo', 'active'],
+  ativo: ['status', 'transactionStatus', 'situacao', 'ativo', 'active'],
   vagas: ['parkingLots', 'vagas', 'parking', 'parkingSpaces', 'garages'],
 };
 
@@ -114,20 +116,26 @@ async function processar(corpo) {
   let mudou = false;
 
   for (const { evento, dados } of itens) {
-    const id = dados && (dados.id || dados._id || dados.base36Id || dados.codigo || dados.code);
+    // nonStop: publication:delete/property:delete trazem só propertyId (+ base36Id)
+    const id = dados && (dados.id || dados.propertyId || dados._id || dados.base36Id || dados.codigo || dados.code);
     if (!id) {
       resultados.push({ id: null, acao: 'ignorado', erro: 'Item sem id/código' });
       continue;
     }
     try {
       if (REMOCAO.test(evento)) {
-        const alvo = store.encontrar(lista, id);
+        const alvo = store.encontrar(lista, id) || (dados.base36Id && store.encontrar(lista, dados.base36Id));
         if (alvo) { lista = lista.filter((i) => i !== alvo); mudou = true; }
         resultados.push({ id, acao: alvo ? 'removido' : 'nao_encontrado' });
         continue;
       }
       const imovel = normalizarImovel(dados);
       const atual = store.encontrar(lista, imovel.id) || store.encontrar(lista, imovel.codigo);
+      // O nonStop pode reenviar um evento antigo depois de um mais novo: descarta dados velhos
+      if (atual && dados.updatedAt && atual.atualizadoEm && new Date(dados.updatedAt) < new Date(atual.atualizadoEm)) {
+        resultados.push({ id: atual.id, acao: 'ignorado', erro: 'Evento mais antigo que o dado atual' });
+        continue;
+      }
       const final = atual ? mesclar(atual, imovel, dados) : imovel;
       lista = lista.filter((i) => i !== atual);
       if (final.ativo) lista.push(final);

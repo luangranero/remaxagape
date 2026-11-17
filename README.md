@@ -31,11 +31,37 @@ public/                front-end (HTML/CSS/JS puro)
 
 ## Webhook
 
+### Configuração no nonStop (sistema por trás do Square)
+
+Documentação oficial: https://docs.usenonstop.com/versions/unstable/webhooks/configuracao
+
+1. Na Netlify (*Site configuration → Environment variables*), crie `WEBHOOK_TOKEN` e `WEBHOOK_SECRET` com
+   valores longos e aleatórios. Depois faça um novo deploy.
+2. No painel do nonStop, abra **Configurações → Webhooks** e, na lista de **imóveis**, cadastre:
+   - **URL:** `https://remaxaagape.netlify.app/api/webhook/imoveis`
+   - **Token:** o mesmo `WEBHOOK_TOKEN` (chega como `Authorization: Bearer ...`)
+   - **Secret:** o mesmo `WEBHOOK_SECRET` (assinatura em `X-Nonstop-Signature: sha256=...`)
+3. Para testar, adicione um imóvel ao site e depois remova-o. Isso gera `publication:create` e
+   `publication:delete`. Confira o resultado em `/api/webhook/log?token=SEU_TOKEN`.
+
+| Evento nonStop | O que o site faz |
+|---|---|
+| `publication:create` | cria ou atualiza o imóvel |
+| `property:update` | atualiza; ignora um reenvio mais antigo (`updatedAt`). Se `transactionStatus` for VENDIDO/ALUGADO, o imóvel sai do ar |
+| `publication:delete` | remove (`propertyId`/`base36Id`) |
+| `property:delete` | remove; IDs desconhecidos são ignorados |
+
+O nonStop reenvia a cada 5 minutos, até 3 vezes. Depois de 3 falhas espaçadas, ele **remove o endpoint**
+e é preciso salvar de novo no painel. Os eventos perdidos não são reenviados, mas a sincronização
+diária das 06:00 recupera o catálogo.
+
+### Formato genérico
+
 **Endpoint:** `POST https://SEU-DOMINIO/api/webhook/imoveis`
 
 **Autenticação** (defina no `.env`, veja `.env.example`):
 - `WEBHOOK_TOKEN`: enviado em `X-Webhook-Token: <token>`, em `Authorization: Bearer <token>` ou em `?token=<token>`
-- ou `WEBHOOK_SECRET`: assinatura HMAC-SHA256 do corpo em `X-Signature` / `X-Hub-Signature-256`
+- ou `WEBHOOK_SECRET`: assinatura HMAC-SHA256 do corpo em `X-Nonstop-Signature`, `X-Hub-Signature-256` ou `X-Signature`
 
 Em produção (`NODE_ENV=production`), sem nenhum dos dois o webhook recusa todas as chamadas.
 

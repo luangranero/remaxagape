@@ -279,7 +279,8 @@ function normalizarImovel(p, extra = {}) {
     atualizadoEm: primeiro(p.updatedAt, p.atualizadoEm, p.updated_at) || new Date().toISOString(),
     ativo: !['VENDIDO', 'ALUGADO', 'INATIVO', 'SUSPENSO', 'ARQUIVADO', 'REMOVIDO'].includes(
       String(primeiro(p.status, p.situacao) || '').toUpperCase(),
-    ) && p.ativo !== false && p.active !== false,
+    ) && !['VENDIDO', 'ALUGADO'].includes(String(p.transactionStatus || '').toUpperCase())
+      && p.ativo !== false && p.active !== false,
   };
 
   imovel.slug = slugify(
